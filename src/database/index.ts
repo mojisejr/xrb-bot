@@ -25,12 +25,10 @@ const COL_NAME = {
   Holders: "Holders",
   Projects: "Projects",
   NFT: "NFTs",
-  Verified: "Verified",
 };
 
 const holderCol = db.collection(COL_NAME.Holders);
 const projectCol = db.collection(COL_NAME.Projects);
 const nftCol = db.collection(COL_NAME.NFT);
-const verCol = db.collection(COL_NAME.Verified);
 
-export { holderCol, projectCol, nftCol, verCol, COL_NAME };
+export { holderCol, projectCol, nftCol, COL_NAME };

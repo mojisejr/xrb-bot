@@ -15,4 +15,8 @@ export interface Verified {
   discordGuildId: string;
   balance: number;
   verified: boolean;
+  nfts: {
+    nftAddress: string;
+    balance: number;
+  }[];
 }

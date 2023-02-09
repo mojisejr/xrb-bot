@@ -1,30 +1,41 @@
+import * as dotenv from "dotenv";
 import { createContract, getBalanceOf } from "../contracts/xrb.contract";
 import { getHolderByWalletAddress } from "../database/holder.service";
 import { getProjectByDiscordId } from "../database/project.service";
 import { giveRole, takeRole } from "../discord/roles.handler";
 import { client } from "../index";
+dotenv.config();
+
+const { discord_guildId } = process.env;
 
 async function transferEventHandler() {
-  const project = await getProjectByDiscordId(process.env.discord_guildId);
+  const project = await getProjectByDiscordId(discord_guildId!);
   project.nftAddresses.forEach((nft) => {
     const contract = createContract(nft.nftAddress);
-    contract.on("Transfer", async (from: string) => {
-      const market = specialAvoidChecking(from);
-      if (!market) {
-        const nftData = await Promise.all(
-          project.nftAddresses.map(
-            async (nft) => await getBalanceOf(nft.nftAddress, from)
-          )
-        );
-        const holder = await getHolderByWalletAddress(from, nft.discordGuildId);
-        const sum = nftData.reduce((a, b) => a + b);
-        if (sum <= 0) {
-          await takeRole(client, holder.discordId, nft.discordGuildId);
-        } else {
-          await giveRole(client, holder.discordId, nft.discordGuildId);
+    contract.on(
+      "Transfer",
+      async (from: string, to: string, tokenId: string) => {
+        console.log("transfer!");
+        const market = specialAvoidChecking(from);
+        if (!market) {
+          const nftData = await Promise.all(
+            project.nftAddresses.map(
+              async (nft) => await getBalanceOf(nft.nftAddress, from)
+            )
+          );
+          const holder = await getHolderByWalletAddress(
+            from,
+            nft.discordGuildId
+          );
+          const sum = nftData.reduce((a, b) => a + b);
+          if (sum <= 0) {
+            await takeRole(client, holder.discordId, nft.discordGuildId);
+          } else {
+            await giveRole(client, holder.discordId, nft.discordGuildId);
+          }
         }
       }
-    });
+    );
   });
 }
 

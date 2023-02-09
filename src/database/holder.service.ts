@@ -1,6 +1,6 @@
-import { holderCol, verCol } from ".";
+import { holderCol } from ".";
 import { Holder, CreateHolderDTO } from "../interfaces/holder.interface";
-import { Verified, VerifyData } from "../interfaces/verify.interface";
+import { VerifyData } from "../interfaces/verify.interface";
 
 async function createOrReturnExsiting(
   holder: CreateHolderDTO
@@ -18,50 +18,32 @@ async function createOrUpdateVerifyHolderData(
   holder: Holder,
   verifyData: VerifyData
 ) {
-  const verifyDataSnapshotOf = await verCol
-    .where("discordId", "==", verifyData.discordId)
-    .get();
+  const verified = holder.verified || [];
+  const filtered = verified.filter(
+    (v) => v.discordGuildId != verifyData.discordGuildId
+  );
+  const updateHolder: Holder = {
+    discordId: holder.discordId,
+    verified: [
+      ...filtered,
+      {
+        walletAddress: verifyData.walletAddress,
+        verified: true,
+        discordGuildId: verifyData.discordGuildId,
+        discordId: verifyData.discordId,
+        balance: verifyData.totalBalance,
+        nfts: verifyData.nftData,
+      },
+    ],
+  };
 
-  if (verifyDataSnapshotOf.docs.length <= 0) {
-    const newVerifyData: Verified = {
-      walletAddress: verifyData.walletAddress,
-      discordId: verifyData.discordId,
-      discordGuildId: verifyData.discordGuildId,
-      balance: verifyData.totalBalance,
-      verified: true,
-    };
-    await verCol.add(newVerifyData);
-    await holderCol
-      .doc(holder.discordId)
-      .update({ verifyData: [newVerifyData] } as Partial<Holder>);
+  const result = await holderCol
+    .doc(updateHolder.discordId)
+    .update({ ...updateHolder });
+  if (result) {
+    return true;
   } else {
-    const verified = verifyDataSnapshotOf.docs.map((v) => {
-      return { id: v.id, data: v.data() as Verified };
-    });
-
-    const updatedData = await Promise.all(
-      verified.map(async (v) => {
-        const { id, data } = v;
-        if (data.discordGuildId == verifyData.discordGuildId) {
-          const updatedData = {
-            ...v.data,
-            balance: verifyData.totalBalance,
-            verified: true,
-          } as Verified;
-          //update verification data
-          await verCol.doc(id).update({ ...updatedData });
-          return updatedData;
-        } else {
-          return v;
-        }
-      })
-    );
-
-    const updatedHolder = { ...holder, verified: updatedData } as Holder;
-    //update holder data
-    await holderCol.doc(verifyData.discordId).update({ ...updatedHolder });
-
-    return updatedHolder;
+    return false;
   }
 }
 
@@ -77,8 +59,52 @@ async function getHolderByWalletAddress(
   return holder[0] as Holder;
 }
 
+async function isVerifiedHolder(
+  discordId: string,
+  walletAddress: string,
+  discordGuildId: string
+) {
+  const snapshot = await holderCol.doc(discordId).get();
+  const holder = snapshot.data() as Holder;
+
+  if (holder == undefined) return true;
+
+  const verified = holder.verified || [];
+
+  if (verified.length <= 0) {
+    return true;
+  } else {
+    const thisProject = verified.find(
+      (v) =>
+        v.discordGuildId == discordGuildId ||
+        v.verified == true ||
+        v.walletAddress == walletAddress
+    );
+
+    return thisProject == undefined ? true : false;
+  }
+}
+
+async function isUsedWallet(walletAddress: string) {
+  console.log(walletAddress);
+  const snapshots = await holderCol.get();
+  const holder = snapshots.docs.map((s) => s.data());
+  const verified = holder.map((h) => h.verified);
+  const found = verified.map((v) => {
+    const result = v.find((w: any) => w.walletAddress == walletAddress);
+    return result;
+  });
+  if (found.length <= 0 || found[0] == undefined) {
+    return false;
+  } else {
+    return true;
+  }
+}
+
 export {
   createOrReturnExsiting,
   createOrUpdateVerifyHolderData,
   getHolderByWalletAddress,
+  isVerifiedHolder,
+  isUsedWallet,
 };

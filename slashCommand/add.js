@@ -3,12 +3,12 @@ const { SlashCommandBuilder } = require("@discordjs/builders");
 const { REST } = require("@discordjs/rest");
 const { Routes } = require("discord-api-types/v9");
 
-clientId = "1013327146393014292";
+clientId = "1072863282689474603";
 guildId = "964899859113078845";
 
 const commands = [
   new SlashCommandBuilder()
-    .setName("Rabbitian")
+    .setName("rabbitian")
     .setDescription("input wallet that has at least one of XRB collections")
     .addStringOption((option) =>
       option
@@ -20,7 +20,7 @@ const commands = [
     ),
 ].map((command) => command.toJSON());
 
-const rest = new REST({ version: 9 }).setToken(process.env.token);
+const rest = new REST({ version: 9 }).setToken(process.env.discord_token);
 
 rest
   .put(Routes.applicationGuildCommands(clientId, guildId), { body: commands })
