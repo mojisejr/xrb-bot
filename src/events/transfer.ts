@@ -45,4 +45,4 @@ async function specialAvoidChecking(address: string) {
   }
 }
 
-transferEventHandler();
+export { transferEventHandler };
