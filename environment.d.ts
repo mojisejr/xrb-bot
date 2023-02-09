@@ -3,6 +3,7 @@ declare global {
     interface ProcessEnv {
       production: boolean;
       discord_token: string;
+      discord_guildId: string;
     }
   }
 }
