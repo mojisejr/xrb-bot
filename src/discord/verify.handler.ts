@@ -4,31 +4,71 @@ import { config } from "../config";
 import { isValidAddress } from "../helper/walletAddress";
 import { getProjectByDiscordId } from "../database/project.service";
 import { getBalanceOf } from "../contracts/xrb.contract";
-import { VerifyDTO } from "../interfaces/verify.interface";
-
-client.on(
-  Events.InteractionCreate,
-  async (interaction) => await onVerify(interaction)
-);
+import { VerifyData } from "../interfaces/verify.interface";
+import {
+  createOrReturnExsiting,
+  createOrUpdateVerifyHolderData,
+  isUsedWallet,
+  isVerifiedHolder,
+} from "../database/holder.service";
+import { giveRole, takeRole } from "./roles.handler";
 
 async function onVerify(interaction: Interaction<CacheType>) {
-  //1. check if collection command
-  //2. get userAddress and discordId
-  //3. loop check and get all balance of all nfts
-  //4. verify save data
-  //5. set role
   if (!interaction.isChatInputCommand()) return;
-  if (interaction.commandName == config.commandName) return;
+  if (interaction.commandName != config.commandName) return;
   if (!interaction.deferred) await interaction.deferReply({ ephemeral: true });
 
-  const verifyData = await getVerifyData(interaction);
-  if (verifyData.length <= 0)
-    await interaction.editReply({ content: "no verify data" });
+  const walletAddress = interaction.options.data[0].value as string;
+  const discordId = interaction.user.id;
+  const guildId = interaction.guild!.id;
 
-  //verify holder here
+  const canVerify = await isVerifiedHolder(discordId, walletAddress, guildId);
+
+  if (!canVerify) {
+    await interaction.editReply({ content: "you have been verified" });
+    return;
+  }
+
+  const usedWallet = await isUsedWallet(walletAddress);
+
+  if (usedWallet) {
+    await interaction.editReply({
+      content: `${walletAddress} is already used to verify this project!`,
+    });
+    return;
+  }
+
+  const verifyData = await getVerifyData(interaction);
+  console.log("nft totalBalance found : ", verifyData.totalBalance);
+  //check balance
+  if (verifyData.totalBalance <= 0) {
+    await interaction.editReply({
+      content: "you have no any collection of this project",
+    });
+    return;
+  }
+
+  const result = await verifyHolder(verifyData);
+
+  if (!result) {
+    await takeRole(client, discordId, guildId);
+    await interaction.editReply({
+      content: "cannot verify this wallet!",
+    });
+    return;
+  } else {
+    await giveRole(client, discordId, guildId);
+    await interaction.editReply({
+      content:
+        "your are verifited, check role and some new channel available now",
+    });
+    return;
+  }
 }
 
-async function getVerifyData(interaction: CommandInteraction<CacheType>) {
+async function getVerifyData(
+  interaction: CommandInteraction<CacheType>
+): Promise<VerifyData> {
   //1. get user discordId from interaction
   //2. get wallet input from command value
   //3. get check nft balance of this wallet
@@ -40,20 +80,46 @@ async function getVerifyData(interaction: CommandInteraction<CacheType>) {
 
   const { nftAddresses } = await getProjectByDiscordId(interaction.guild!.id);
 
-  const verifyData = await Promise.all(
+  const nftData = await Promise.all(
     nftAddresses.map(async (nft) => {
       const balance = await getBalanceOf(nft.nftAddress, walletAddress);
       return {
-        discordGuildId: interaction.guild!.id,
-        userDiscordId: interaction.user.id,
         nftAddress: nft.nftAddress,
-        walletAddress,
         balance,
-      } as VerifyDTO;
+      };
     })
   );
 
-  const sum = verifyData.reduce((a, b) => a.balance + b.balance);
+  const totalBalance = nftData
+    .map((data) => data.balance)
+    .reduce((a, b) => a + b);
 
-  return { verifyData, sum };
+  const verifyData = {
+    discordGuildId: interaction.guild!.id,
+    discordId: interaction.user.id,
+    walletAddress,
+    totalBalance,
+    nftData,
+  };
+
+  return verifyData;
 }
+
+async function verifyHolder(verifyDataDTO: VerifyData): Promise<boolean> {
+  const holder = await createOrReturnExsiting({
+    discordId: verifyDataDTO.discordId,
+  });
+
+  const verifiedHolder = await createOrUpdateVerifyHolderData(
+    holder,
+    verifyDataDTO
+  );
+
+  if (verifiedHolder != undefined) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+export { onVerify };

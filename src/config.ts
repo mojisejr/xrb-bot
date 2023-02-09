@@ -1,3 +1,3 @@
 export const config = {
-  commandName: "Rabbitian",
+  commandName: "rabbitian",
 };
