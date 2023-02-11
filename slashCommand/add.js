@@ -4,7 +4,7 @@ const { REST } = require("@discordjs/rest");
 const { Routes } = require("discord-api-types/v9");
 
 clientId = "1072863282689474603";
-guildId = "964899859113078845";
+guildId = "954614291078721606";
 
 const commands = [
   new SlashCommandBuilder()

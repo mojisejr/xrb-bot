@@ -73,8 +73,9 @@ async function getVerifyData(
   //2. get wallet input from command value
   //3. get check nft balance of this wallet
   const isValid = isValidAddress(interaction.options.data[0].value as string);
-  if (!isValid)
+  if (!isValid) {
     await interaction.editReply({ content: "Error: invalid wallet address" });
+  }
 
   const walletAddress = interaction.options.data[0].value as string;
 
@@ -83,6 +84,7 @@ async function getVerifyData(
   const nftData = await Promise.all(
     nftAddresses.map(async (nft) => {
       const balance = await getBalanceOf(nft.nftAddress, walletAddress);
+      console.log(nft.nftAddress, balance);
       return {
         nftAddress: nft.nftAddress,
         balance,
@@ -90,9 +92,10 @@ async function getVerifyData(
     })
   );
 
-  const totalBalance = nftData
-    .map((data) => data.balance)
-    .reduce((a, b) => a + b);
+  const totalBalance =
+    nftData.length <= 0
+      ? 0
+      : nftData.map((data) => data.balance).reduce((a, b) => a + b);
 
   const verifyData = {
     discordGuildId: interaction.guild!.id,
